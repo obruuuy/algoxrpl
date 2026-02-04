@@ -52,7 +52,7 @@
         ];
 
         let currentIdx = 0;
-        let timeLeft = 300;
+        let timeLeft = 600;
         let timer;
         let studentData = { nama: '', kelas: '', answers: [] };
         let currentUser = null;
@@ -99,7 +99,7 @@
 
         function resetTimer() {
             clearInterval(timer);
-            timeLeft = 300;
+            timeLeft = 600;
             updateTimerUI();
             timer = setInterval(() => {
                 timeLeft--;
@@ -112,7 +112,7 @@
             const timerEl = document.getElementById('quiz-timer');
             const barEl = document.getElementById('timer-bar');
             if(timerEl) timerEl.innerText = timeLeft + "s";
-            if(barEl) barEl.style.width = (timeLeft/300)*100 + "%";
+            if(barEl) barEl.style.width = (timeLeft/600)*100 + "%";
             if(timeLeft < 10) timerEl.classList.add('text-red-600');
             else timerEl.classList.remove('text-red-600');
         }
@@ -235,7 +235,7 @@
     <div id="app-container" class="w-full max-w-4xl glass rounded-[2.5rem] overflow-hidden border-4 border-black shadow-[20px_20px_0px_0px_rgba(0,0,0,0.1)]">
         
         <div class="pop-gradient p-8 text-white border-b-4 border-black text-center">
-            <h1 class="text-3xl font-black italic tracking-tighter uppercase">WELCOM TO LAND OF DOWN</h1>
+            <h1 class="text-3xl font-black italic tracking-tighter uppercase">- WELCOME TO LAND OF DOWN -</h1>
             <p class="text-xs font-bold opacity-80 uppercase tracking-widest">SMKN Kasomalang • Dani Setiawan</p>
         </div>
 
@@ -243,7 +243,7 @@
             <!-- VIEW LANDING -->
             <div id="view-landing" class="view-segment grid md:grid-cols-2 gap-8">
                 <div class="neubrutal neubrutal-yellow p-8 rounded-3xl">
-                    <h2 class="text-2xl font-black mb-6 italic">🚀 MULAI UJIAN</h2>
+                    <h2 class="text-2xl font-black mb-6 italic">🚀 MULAI</h2>
                     <div class="space-y-4">
                         <input id="input-nama" type="text" placeholder="NAMA LENGKAP" class="w-full p-4 border-4 border-black rounded-xl font-bold uppercase outline-none focus:bg-white">
                         <select id="input-kelas" class="w-full p-4 border-4 border-black rounded-xl font-bold outline-none bg-white">
@@ -254,7 +254,7 @@
                     </div>
                 </div>
                 <div class="flex flex-col justify-center neubrutal p-8 rounded-3xl bg-white">
-                    <h2 class="text-xl font-black mb-4 uppercase">👨‍🏫 AREA GURU</h2>
+                    <h2 class="text-xl font-black mb-4 uppercase">👨‍🏫GURU</h2>
                     <p class="text-sm font-bold text-gray-600 mb-6 italic">Monitor skor otomatis dan analisis feedback AI.</p>
                     <button onclick="window.showView('view-teacher-auth')" class="w-full border-4 border-black p-3 rounded-xl font-black hover:bg-black hover:text-white transition">PANEL SKOR</button>
                 </div>
@@ -286,7 +286,7 @@
             <!-- VIEW GRADING -->
             <div id="view-grading" class="view-segment hidden text-center py-16">
                 <div class="inline-block animate-spin text-6xl mb-6">⚙️</div>
-                <h2 class="text-3xl font-black italic">AI SEDANG MENILAI...</h2>
+                <h2 class="text-3xl font-black italic">SEDANG MENILAI...</h2>
                 <p class="font-bold text-gray-500 uppercase text-xs tracking-widest mt-2">Menganalisis logika algoritma siswa</p>
             </div>
 
@@ -295,7 +295,7 @@
                 <div class="neubrutal neubrutal-yellow inline-block p-10 rounded-full text-7xl font-black mb-8 border-[6px]">
                     <span id="final-score">0</span>
                 </div>
-                <h2 class="text-3xl font-black mb-2 italic">UJIAN SELESAI</h2>
+                <h2 class="text-3xl font-black mb-2 italic">SELESAI</h2>
                 <div class="neubrutal bg-white p-6 rounded-2xl max-w-md mx-auto mb-8 shadow-[6px_6px_0px_0px_rgba(0,0,0,0.1)]">
                     <p id="ai-feedback" class="font-bold italic text-gray-700 leading-relaxed">Feedback AI...</p>
                 </div>
@@ -304,7 +304,7 @@
 
             <!-- VIEW TEACHER AUTH -->
             <div id="view-teacher-auth" class="view-segment hidden max-w-sm mx-auto text-center py-10">
-                <h2 class="text-2xl font-black mb-6 italic tracking-tighter">PASSWORD GURU</h2>
+                <h2 class="text-2xl font-black mb-6 italic tracking-tighter">PASSWORD</h2>
                 <input id="teacher-pass" type="password" class="w-full p-4 border-4 border-black rounded-xl text-center text-3xl font-black mb-6 outline-none focus:bg-yellow-50">
                 <div class="flex gap-4">
                     <button onclick="window.showView('view-landing')" class="flex-1 font-bold text-gray-400">BATAL</button>
