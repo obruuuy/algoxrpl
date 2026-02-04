@@ -52,7 +52,7 @@
         ];
 
         let currentIdx = 0;
-        let timeLeft = 60;
+        let timeLeft = 300;
         let timer;
         let studentData = { nama: '', kelas: '', answers: [] };
         let currentUser = null;
@@ -99,7 +99,7 @@
 
         function resetTimer() {
             clearInterval(timer);
-            timeLeft = 60;
+            timeLeft = 300;
             updateTimerUI();
             timer = setInterval(() => {
                 timeLeft--;
@@ -112,7 +112,7 @@
             const timerEl = document.getElementById('quiz-timer');
             const barEl = document.getElementById('timer-bar');
             if(timerEl) timerEl.innerText = timeLeft + "s";
-            if(barEl) barEl.style.width = (timeLeft/60)*100 + "%";
+            if(barEl) barEl.style.width = (timeLeft/300)*100 + "%";
             if(timeLeft < 10) timerEl.classList.add('text-red-600');
             else timerEl.classList.remove('text-red-600');
         }
