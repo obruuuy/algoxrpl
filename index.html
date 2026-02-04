@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuis Algoritma AI | SMKN Kasomalang</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Global State & Config
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'smkn-kasomalang-quiz';
+        const apiKey = "AIzaSyA60tBH7nFR7hL6h4l4zO62NegiScmhpGY"; // API Key Gemini provided at runtime
+
+        const questions = [
+            { id: 1, cat: "Natural", q: "Jelaskan langkah algoritma bahasa natural untuk proses keluar dari parkir otomatis, mulai dari scan kartu hingga palang terbuka." },
+            { id: 2, cat: "Flowchart", q: "Mengapa simbol Decision (Belah Ketupat) sangat krusial dalam algoritma pembayaran parkir? Berikan contoh satu kondisi yang diperiksa!" },
+            { id: 3, cat: "Pseudocode", q: "IF durasi > 2 THEN tarif = 5000 + (durasi-2)*2000 ELSE tarif = 5000. Jika durasi = 4, berapakah tarifnya? Tunjukkan langkah berhitungnya!" }
+        ];
+
+        let currentIdx = 0;
+        let timeLeft = 60;
+        let timer;
+        let studentData = { nama: '', kelas: '', answers: [] };
+        let currentUser = null;
+
+        // AUTH INITIALIZATION
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                signInAnonymously(auth);
+            } else {
+                currentUser = user;
+            }
+        });
+
+        // VIEW CONTROLLER
+        window.showView = (id) => {
+            document.querySelectorAll('.view-segment').forEach(v => v.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        };
+
+        // START QUIZ
+        window.startQuiz = () => {
+            const nama = document.getElementById('input-nama').value;
+            if(!nama.trim()) return alert("Masukkan Nama Lengkap!");
+            studentData.nama = nama;
+            studentData.kelas = document.getElementById('input-kelas').value;
+            window.showView('view-quiz');
+            loadQuestion();
+        };
+
+        function loadQuestion() {
+            const q = questions[currentIdx];
+            document.getElementById('quiz-category').innerText = `Algoritma ${q.cat}`;
+            document.getElementById('quiz-number').innerText = `SOAL 0${q.id}`;
+            document.getElementById('question-text').innerText = q.q;
+            document.getElementById('answer-input').value = "";
+            resetTimer();
+        }
+
+        function resetTimer() {
+            clearInterval(timer);
+            timeLeft = 60;
+            updateTimerUI();
+            timer = setInterval(() => {
+                timeLeft--;
+                updateTimerUI();
+                if(timeLeft <= 0) window.nextQuestion();
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            document.getElementById('quiz-timer').innerText = timeLeft + "s";
+            document.getElementById('timer-bar').style.width = (timeLeft/60)*100 + "%";
+            if(timeLeft < 10) document.getElementById('quiz-timer').classList.add('text-red-600');
+        }
+
+        window.nextQuestion = () => {
+            studentData.answers.push({
+                soal: questions[currentIdx].q,
+                jawaban: document.getElementById('answer-input').value
+            });
+
+            if(currentIdx < questions.length - 1) {
+                currentIdx++;
+                loadQuestion();
+            } else {
+                clearInterval(timer);
+                evaluateWithAI();
+            }
+        };
+
+        // AI EVALUATION LOGIC
+        async function evaluateWithAI() {
+            window.showView('view-grading');
+            
+            const prompt = `
+                Bertindaklah sebagai Guru SMK RPL. Nilai jawaban essay siswa berikut tentang algoritma parkir.
+                Gunakan kriteria: Logika (50%), Ketepatan Istilah (30%), Kelengkapan Alur (20%).
+                Berikan skor total 0-100 dan umpan balik singkat.
+                
+                Data Siswa: ${studentData.nama} (${studentData.kelas})
+                Jawaban:
+                ${studentData.answers.map((a, i) => `Soal ${i+1}: ${a.soal}\nJawaban: ${a.jawaban}`).join('\n')}
+                
+                Format JSON: {"score": number, "feedback": "string"}
+            `;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                
+                const data = await response.json();
+                const aiResult = JSON.parse(data.candidates[0].content.parts[0].text);
+                
+                // Simpan ke Firestore
+                if (currentUser) {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'scores'), {
+                        nama: studentData.nama,
+                        kelas: studentData.kelas,
+                        score: aiResult.score,
+                        feedback: aiResult.feedback,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+
+                document.getElementById('final-score').innerText = aiResult.score;
+                document.getElementById('ai-feedback').innerText = aiResult.feedback;
+                window.showView('view-result');
+                
+            } catch (error) {
+                console.error("AI Error:", error);
+                alert("Gagal menghubungi AI. Skor otomatis 70 diberikan sebagai cadangan.");
+                document.getElementById('final-score').innerText = "70";
+                window.showView('view-result');
+            }
+        }
+
+        // TEACHER LOGIC
+        window.verifyTeacher = () => {
+            const pass = document.getElementById('teacher-pass').value;
+            if(pass === '212105') {
+                window.showView('view-teacher-panel');
+                fetchScores();
+            } else {
+                alert("Password Salah!");
+            }
+        };
+
+        function fetchScores() {
+            const q = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
+            onSnapshot(q, (snapshot) => {
+                const body = document.getElementById('scores-table-body');
+                body.innerHTML = '';
+                snapshot.docs.forEach(doc => {
+                    const d = doc.data();
+                    const row = `
+                        <tr class="hover:bg-blue-50">
+                            <td class="p-4 font-bold border-b">${d.nama}</td>
+                            <td class="p-4 border-b">${d.kelas}</td>
+                            <td class="p-4 border-b text-center font-black text-blue-600 text-xl">${d.score}</td>
+                            <td class="p-4 border-b text-xs text-gray-500 italic">${d.feedback}</td>
+                        </tr>
+                    `;
+                    body.innerHTML += row;
+                });
+            });
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #fdfdfd; }
+        .pop-gradient { background: linear-gradient(135deg, #FF3CAC 0%, #784BA0 50%, #2B86C5 100%); }
+        .glass { background: rgba(255, 255, 255, 1); }
+        .neubrutal { border: 4px solid black; box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); }
+        .neubrutal-yellow { background: #FFD600; }
+        .neubrutal-blue { background: #3498db; color: white; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="app-container" class="w-full max-w-4xl glass rounded-[2.5rem] overflow-hidden border-4 border-black shadow-[20px_20px_0px_0px_rgba(0,0,0,0.1)]">
+        
+        <div class="pop-gradient p-8 text-white border-b-4 border-black text-center">
+            <h1 class="text-3xl font-black italic tracking-tighter">ALGO-QUIZ AI</h1>
+            <p class="text-xs font-bold opacity-80 uppercase tracking-widest">SMKN Kasomalang • Pak Dani Setiawan</p>
+        </div>
+
+        <div class="p-6 md:p-10">
+            <!-- VIEW LANDING -->
+            <div id="view-landing" class="view-segment grid md:grid-cols-2 gap-8">
+                <div class="neubrutal neubrutal-yellow p-8 rounded-3xl">
+                    <h2 class="text-2xl font-black mb-6 italic">🚀 MULAI UJIAN</h2>
+                    <input id="input-nama" type="text" placeholder="NAMA LENGKAP" class="w-full p-4 mb-4 border-4 border-black rounded-xl font-bold uppercase">
+                    <select id="input-kelas" class="w-full p-4 mb-6 border-4 border-black rounded-xl font-bold">
+                        <option>X RPL A</option>
+                        <option>X RPL B</option>
+                    </select>
+                    <button onclick="startQuiz()" class="w-full bg-black text-white p-4 rounded-xl font-black text-lg hover:translate-x-1 hover:translate-y-1 transition">MASUK KELAS</button>
+                </div>
+                <div class="flex flex-col justify-center neubrutal p-8 rounded-3xl bg-white">
+                    <h2 class="text-xl font-black mb-4">👨‍🏫 GURU</h2>
+                    <p class="text-sm font-bold text-gray-600 mb-6">Pantau skor siswa secara real-time dengan asisten AI.</p>
+                    <button onclick="window.showView('view-teacher-auth')" class="w-full border-4 border-black p-3 rounded-xl font-black hover:bg-black hover:text-white transition">PANEL SKOR</button>
+                </div>
+            </div>
+
+            <!-- VIEW QUIZ -->
+            <div id="view-quiz" class="view-segment hidden animate__animated animate__fadeIn">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <span id="quiz-category" class="bg-black text-white text-[10px] font-black px-2 py-1 rounded italic uppercase">ALGORITMA</span>
+                        <h3 id="quiz-number" class="text-4xl font-black">SOAL 01</h3>
+                    </div>
+                    <div class="text-right">
+                        <div id="quiz-timer" class="text-3xl font-black italic">60s</div>
+                        <div class="w-24 h-2 bg-gray-200 border-2 border-black rounded-full overflow-hidden">
+                            <div id="timer-bar" class="h-full bg-black" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="neubrutal bg-white p-6 rounded-2xl mb-6">
+                    <p id="question-text" class="text-xl font-bold leading-snug">Memuat pertanyaan...</p>
+                </div>
+                <textarea id="answer-input" rows="5" class="w-full p-4 border-4 border-black rounded-2xl font-bold text-lg outline-none focus:bg-yellow-50" placeholder="Tulis jawabanmu..."></textarea>
+                <div class="flex justify-end mt-6">
+                    <button onclick="nextQuestion()" class="bg-black text-white px-8 py-3 rounded-xl font-black text-xl hover:shadow-none">LANJUT ➔</button>
+                </div>
+            </div>
+
+            <!-- VIEW GRADING -->
+            <div id="view-grading" class="view-segment hidden text-center py-16">
+                <div class="inline-block animate-spin text-6xl mb-6">✨</div>
+                <h2 class="text-3xl font-black italic">AI SEDANG MENILAI...</h2>
+                <p class="font-bold text-gray-500 uppercase text-xs tracking-widest">Menganalisis logika algoritma siswa</p>
+            </div>
+
+            <!-- VIEW RESULT -->
+            <div id="view-result" class="view-segment hidden text-center animate__animated animate__zoomIn">
+                <div class="neubrutal neubrutal-yellow inline-block p-10 rounded-full text-6xl font-black mb-8">
+                    <span id="final-score">0</span>
+                </div>
+                <h2 class="text-3xl font-black mb-4">HASIL KOMPETENSI</h2>
+                <div class="neubrutal bg-white p-6 rounded-2xl max-w-md mx-auto mb-8">
+                    <p id="ai-feedback" class="font-bold italic text-gray-700">Feedback AI...</p>
+                </div>
+                <button onclick="location.reload()" class="font-black border-b-4 border-black uppercase text-sm">Kembali</button>
+            </div>
+
+            <!-- VIEW TEACHER AUTH -->
+            <div id="view-teacher-auth" class="view-segment hidden max-w-sm mx-auto text-center py-10">
+                <h2 class="text-2xl font-black mb-6 italic">PASSWORD GURU</h2>
+                <input id="teacher-pass" type="password" class="w-full p-4 border-4 border-black rounded-xl text-center text-2xl font-black mb-6">
+                <button onclick="verifyTeacher()" class="w-full bg-black text-white p-4 rounded-xl font-black">BUKA PANEL</button>
+            </div>
+
+            <!-- VIEW TEACHER PANEL -->
+            <div id="view-teacher-panel" class="view-segment hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-black">REKAP NILAI AI</h2>
+                    <button onclick="location.reload()" class="bg-red-500 text-white px-4 py-1 rounded font-bold text-xs border-2 border-black">KELUAR</button>
+                </div>
+                <div class="overflow-auto border-4 border-black rounded-2xl">
+                    <table class="w-full bg-white">
+                        <thead class="bg-black text-white text-xs uppercase">
+                            <tr>
+                                <th class="p-4">Nama</th>
+                                <th class="p-4">Kelas</th>
+                                <th class="p-4 text-center">Skor</th>
+                                <th class="p-4">Feedback AI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scores-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>
